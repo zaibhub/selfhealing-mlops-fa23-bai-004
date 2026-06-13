@@ -38,10 +38,12 @@ pipeline {
             steps {
                 sh '''
                     docker run --rm --network container:sentiment-test \
-                        -v $WORKSPACE:/workspace -w /workspace \
+                        -v jenkins_home:/workspace_data \
+                        -w /workspace_data/workspace/sentiment-ci-pipeline \
                         -e BASE_URL=http://localhost:5000 \
+                        -e HOME=/tmp \
                         selenium/standalone-chrome:latest \
-                        bash -c "pip3 install selenium pytest requests --break-system-packages && python3 -m pytest tests/test_ui.py -v"
+                        bash -c "pip3 install selenium pytest requests --break-system-packages --user 2>/dev/null || pip3 install selenium pytest requests --break-system-packages; python3 -m pytest tests/test_ui.py -v -p no:cacheprovider"
                 '''
             }
         }
