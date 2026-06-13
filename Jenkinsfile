@@ -1,0 +1,83 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
+        IMAGE_UNSTABLE = "alizaibdocker/sentiment-api:unstable"
+        IMAGE_STABLE = "alizaibdocker/sentiment-api:stable"
+    }
+
+    stages {
+        stage('Fetch') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build and Run') {
+            steps {
+                sh '''
+                    docker build -t sentiment-api:unstable-test .
+                    docker rm -f sentiment-test || true
+                    docker run -d --name sentiment-test -p 5001:5000 sentiment-api:unstable-test
+                    sleep 30
+                '''
+            }
+        }
+
+        stage('Unit Test') {
+            steps {
+                sh '''
+                    docker exec sentiment-test pip install pytest requests
+                    docker exec -e BASE_URL=http://localhost:5000 sentiment-test python -m pytest tests/test_api.py -v
+                '''
+            }
+        }
+
+        stage('UI Test') {
+            steps {
+                sh '''
+                    docker run --rm --network container:sentiment-test \
+                        -v $WORKSPACE:/workspace -w /workspace \
+                        -e BASE_URL=http://localhost:5000 \
+                        selenium/standalone-chrome:latest \
+                        bash -c "pip3 install selenium pytest requests --break-system-packages && python3 -m pytest tests/test_ui.py -v"
+                '''
+            }
+        }
+
+        stage('Build and Push') {
+            steps {
+                sh '''
+                    docker build -t $IMAGE_UNSTABLE .
+                    echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
+                    docker push $IMAGE_UNSTABLE
+
+                    git fetch origin stable-fallback
+                    git checkout origin/stable-fallback -- .
+                    docker build -t $IMAGE_STABLE .
+                    docker push $IMAGE_STABLE
+
+                    git checkout .
+                '''
+            }
+        }
+
+        stage('Deploy to Minikube') {
+            steps {
+                sh '''
+                    kubectl apply -f k8s/pvc.yaml
+                    kubectl apply -f k8s/blue-deployment.yaml
+                    kubectl apply -f k8s/green-deployment.yaml
+                    kubectl apply -f k8s/service.yaml
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            sh 'docker rm -f sentiment-test || true'
+        }
+    }
+}

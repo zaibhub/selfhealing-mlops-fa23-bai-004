@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentiment-green-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      slot: green
+  template:
+    metadata:
+      labels:
+        slot: green
+    spec:
+      containers:
+        - name: sentiment-api
+          image: alizaibdocker/sentiment-api:stable
+          ports:
+            - containerPort: 5000

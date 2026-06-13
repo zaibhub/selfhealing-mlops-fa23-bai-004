@@ -1,0 +1,11 @@
+route:
+  receiver: jenkins-rollback-webhook
+
+receivers:
+  - name: jenkins-rollback-webhook
+    webhook_configs:
+      - url: 'http://16.170.235.197:8080/generic-webhook-trigger/invoke?token=ROLLBACK_582804_TOKEN'
+        http_config:
+          basic_auth:
+            username: 'alizaibjenkins'
+            password: '11f52e21fbd34bd083d022e51777cd3588'
