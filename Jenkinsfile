@@ -51,7 +51,7 @@ pipeline {
         stage('Build and Push') {
             steps {
                 sh '''
-                    docker build -t $IMAGE_UNSTABLE .
+                    docker tag sentiment-api:unstable-test $IMAGE_UNSTABLE
                     echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
                     docker push $IMAGE_UNSTABLE
 
@@ -79,7 +79,14 @@ pipeline {
 
     post {
         always {
-            sh 'docker rm -f sentiment-test || true'
+            sh '''
+                docker rm -f sentiment-test || true
+                docker rmi sentiment-api:unstable-test || true
+                docker rmi $IMAGE_UNSTABLE || true
+                docker rmi $IMAGE_STABLE || true
+                docker image prune -f || true
+                docker builder prune -f || true
+            '''
         }
     }
 }
